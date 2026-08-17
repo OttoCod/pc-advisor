@@ -1,0 +1,13 @@
+node_modules
+.next
+out
+build
+dist
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+.env
+.env.local
+.DS_Store
+npm-debug.log*
