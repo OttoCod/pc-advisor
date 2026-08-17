@@ -73,7 +73,7 @@ Todo el motor de cálculo es TypeScript puro sin dependencias de React —
 
 ## Qué quedó pendiente para un MVP completo
 
-- **Más benchmarks reales**: hoy solo hay 10 filas cargadas a mano en
+- **Más benchmarks reales**: hoy hay 31 filas cargadas a mano en
   `db/seed.ts` (`source: "real"`); el resto de las combinaciones se resuelve
   por interpolación. Cuantos más benchmarks reales se carguen, mejor la
   confianza general del sitio.
