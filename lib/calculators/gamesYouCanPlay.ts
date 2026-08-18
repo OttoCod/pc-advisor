@@ -1,3 +1,4 @@
+import { computeComponentDemand, type ComponentDemand } from "./demand";
 import type { Benchmark, Cpu, Game, Gpu, Preset, Resolution } from "./types";
 import { PRESETS } from "./types";
 import { estimateFps, type FpsEstimate } from "./fps";
@@ -6,6 +7,7 @@ export interface GameEstimate {
   gameId: string;
   name: string;
   genre: string | null;
+  demand: ComponentDemand;
   estimates: Record<Preset, FpsEstimate>;
 }
 
@@ -24,6 +26,12 @@ export function gamesYouCanPlay(params: {
     for (const preset of PRESETS) {
       estimates[preset] = estimateFps({ cpu, gpu, game, resolution, preset, rayTracing, benchmarks });
     }
-    return { gameId: game.id, name: game.name, genre: game.genre, estimates };
+    return {
+      gameId: game.id,
+      name: game.name,
+      genre: game.genre,
+      demand: computeComponentDemand(game),
+      estimates,
+    };
   });
 }
