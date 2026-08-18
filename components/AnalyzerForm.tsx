@@ -8,8 +8,14 @@ import type { GameEstimate } from "@/lib/calculators/gamesYouCanPlay";
 import type { ProfileResult } from "@/lib/calculators/profile";
 import type { Cpu, Gpu, Preset, RamGb, Resolution } from "@/lib/calculators/types";
 import { PRESETS, RAM_OPTIONS, RESOLUTIONS } from "@/lib/calculators/types";
-import type { UpgradeSuggestion } from "@/lib/calculators/upgrade";
+import { listUpgradeCandidates, type UpgradeSuggestion } from "@/lib/calculators/upgrade";
 import { buildShareSearch, type ShareParams } from "@/lib/shareParams";
+
+interface CompareResponse {
+  candidate: Cpu | Gpu;
+  profile: ProfileResult;
+  games: GameEstimate[];
+}
 
 interface AnalyzeResponse {
   cpu: Cpu;
@@ -128,6 +134,165 @@ function ShareButton({ result }: { result: AnalyzeResponse }) {
           onFocus={(e) => e.currentTarget.select()}
           className="animate-fade-up w-full max-w-xs rounded-md border border-border bg-surface-2 px-2.5 py-1.5 font-mono text-[11px] text-fg-muted outline-none focus:border-accent sm:max-w-sm"
         />
+      )}
+    </div>
+  );
+}
+
+function UpgradeCandidates({
+  component,
+  current,
+  candidates,
+  cpuId,
+  gpuId,
+  ramGb,
+  resolution,
+  preset,
+  mainGames,
+  currentOverallScore,
+}: {
+  component: "cpu" | "gpu";
+  current: Cpu | Gpu;
+  candidates: (Cpu | Gpu)[];
+  cpuId: string;
+  gpuId: string;
+  ramGb: RamGb;
+  resolution: Resolution;
+  preset: Preset;
+  mainGames: GameEstimate[];
+  currentOverallScore: number;
+}) {
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [comparison, setComparison] = useState<CompareResponse | null>(null);
+
+  if (candidates.length === 0) return null;
+
+  async function handleSelect(candidateId: string) {
+    setSelectedId(candidateId);
+    setLoading(true);
+    setError(null);
+    setComparison(null);
+
+    try {
+      const res = await fetch("/api/compare", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cpuId, gpuId, ramGb, resolution, replace: component, candidateId }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error ?? "No pudimos comparar. Intentá de nuevo.");
+      }
+
+      const data: CompareResponse = await res.json();
+      setComparison(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Ocurrió un error inesperado.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const mainGamesById = new Map(mainGames.map((g) => [g.gameId, g]));
+  const sortedComparisonGames = comparison
+    ? [...comparison.games].sort((a, b) => a.name.localeCompare(b.name))
+    : [];
+  const scoreImproved = comparison ? comparison.profile.overallScore > currentOverallScore : false;
+
+  return (
+    <div className="mt-6 border-t border-border pt-5">
+      <p className="text-xs text-fg-muted">
+        {component === "cpu" ? "CPUs" : "GPUs"} mejores que tu {current.brand} {current.model}, de menor a
+        mayor:
+      </p>
+      <div className="mt-2.5 flex flex-wrap gap-2">
+        {candidates.map((candidate) => (
+          <button
+            key={candidate.id}
+            type="button"
+            onClick={() => handleSelect(candidate.id)}
+            className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+              selectedId === candidate.id
+                ? "border-accent bg-accent text-white"
+                : "border-border bg-surface-2 text-fg-muted hover:text-fg"
+            }`}
+          >
+            {candidate.brand} {candidate.model}
+          </button>
+        ))}
+      </div>
+
+      {loading && (
+        <p className="mt-4 flex items-center gap-2 text-xs text-fg-muted">
+          Calculando comparación <LoadingDots />
+        </p>
+      )}
+
+      {error && <p className="mt-4 text-xs text-danger">{error}</p>}
+
+      {comparison && !loading && (
+        <div className="animate-fade-up mt-4 rounded-lg border border-border bg-surface-2 p-4">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-fg-muted">
+            <span>Puntaje general:</span>
+            <span className="font-mono text-fg-muted">{currentOverallScore}</span>
+            <span>→</span>
+            <span className={`font-mono font-medium ${scoreImproved ? "text-good" : "text-fg"}`}>
+              {comparison.profile.overallScore}
+            </span>
+          </div>
+
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full min-w-[440px] border-collapse text-sm">
+              <thead>
+                <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-fg-muted">
+                  <th className="pb-2 font-medium">Juego</th>
+                  <th className="pb-2 font-medium">FPS actual</th>
+                  <th className="pb-2 font-medium">
+                    FPS con {comparison.candidate.brand} {comparison.candidate.model}
+                  </th>
+                  <th className="pb-2 font-medium">Δ</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedComparisonGames.map((game) => {
+                  const before = mainGamesById.get(game.gameId)?.estimates[preset];
+                  const after = game.estimates[preset];
+                  if (!before) return null;
+                  const beforeMid = (before.fpsLow + before.fpsHigh) / 2;
+                  const afterMid = (after.fpsLow + after.fpsHigh) / 2;
+                  const delta = Math.round(afterMid - beforeMid);
+                  return (
+                    <tr key={game.gameId} className="border-b border-border/60 last:border-0">
+                      <td className="py-2.5 text-fg">{game.name}</td>
+                      <td className="py-2.5 font-mono tabular-nums text-fg-muted">
+                        {before.fpsLow}–{before.fpsHigh}
+                      </td>
+                      <td className="py-2.5 font-mono tabular-nums text-fg">
+                        {after.fpsLow}–{after.fpsHigh}
+                      </td>
+                      <td
+                        className={`py-2.5 font-mono tabular-nums ${
+                          delta > 0 ? "text-good" : delta < 0 ? "text-danger" : "text-fg-muted"
+                        }`}
+                      >
+                        {delta > 0 ? "+" : ""}
+                        {delta}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <p className="mt-3 text-xs leading-relaxed text-fg-muted">
+            Estimación manteniendo el resto de tu hardware igual, a {resolution} y calidad{" "}
+            {PRESET_LABELS[preset].toLowerCase()}. Sigue siendo una proyección, no una medición.
+          </p>
+        </div>
       )}
     </div>
   );
@@ -294,7 +459,16 @@ export function AnalyzerForm({
         </p>
       )}
 
-      {result && <Results result={result} preset={preset} onPresetChange={setPreset} />}
+      {result && (
+        <Results
+          key={`${result.cpu.id}-${result.gpu.id}-${result.ramGb}-${result.resolution}`}
+          result={result}
+          preset={preset}
+          onPresetChange={setPreset}
+          cpus={cpus}
+          gpus={gpus}
+        />
+      )}
     </div>
   );
 }
@@ -303,12 +477,27 @@ function Results({
   result,
   preset,
   onPresetChange,
+  cpus,
+  gpus,
 }: {
   result: AnalyzeResponse;
   preset: Preset;
   onPresetChange: (preset: Preset) => void;
+  cpus: Cpu[];
+  gpus: Gpu[];
 }) {
   const sortedGames = [...result.games].sort((a, b) => a.name.localeCompare(b.name));
+
+  const primaryUpgrade = result.upgrades.find(
+    (u): u is UpgradeSuggestion & { component: "cpu" | "gpu" } =>
+      (u.component === "cpu" || u.component === "gpu") && u.priority >= 3
+  );
+  const upgradeCandidates = primaryUpgrade
+    ? listUpgradeCandidates(
+        primaryUpgrade.component === "cpu" ? result.cpu : result.gpu,
+        primaryUpgrade.component === "cpu" ? cpus : gpus
+      )
+    : [];
 
   return (
     <div className="space-y-10">
@@ -388,6 +577,21 @@ function Results({
             </div>
           ))}
         </div>
+
+        {primaryUpgrade && upgradeCandidates.length > 0 && (
+          <UpgradeCandidates
+            component={primaryUpgrade.component}
+            current={primaryUpgrade.component === "cpu" ? result.cpu : result.gpu}
+            candidates={upgradeCandidates}
+            cpuId={result.cpu.id}
+            gpuId={result.gpu.id}
+            ramGb={result.ramGb}
+            resolution={result.resolution}
+            preset={preset}
+            mainGames={result.games}
+            currentOverallScore={result.profile.overallScore}
+          />
+        )}
       </section>
 
       {/* 4. Qué juegos podés jugar */}
