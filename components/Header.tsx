@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PulseDot } from "@/components/PulseDot";
 
 function HomeIcon({ className }: { className?: string }) {
   return (
@@ -23,12 +24,17 @@ export function Header() {
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-bg/75 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
-        <Link
-          href="/"
-          className="font-display text-lg font-semibold tracking-tight text-fg transition-colors hover:text-accent"
-        >
-          PC Advisor
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/"
+            className="font-display text-lg font-semibold tracking-tight text-fg transition-colors hover:text-accent"
+          >
+            PC Advisor
+          </Link>
+          <span className="hidden sm:block">
+            <PulseDot label="en vivo" />
+          </span>
+        </div>
         <Link
           href="/"
           className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-fg-muted transition-colors hover:text-fg"
