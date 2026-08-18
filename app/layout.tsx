@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Mono, IBM_Plex_Sans, Space_Grotesk } from "next/font/google";
 import "./globals.css";
+import { CursorTargetLock } from "@/components/CursorTargetLock";
 import { Header } from "@/components/Header";
 
 const spaceGrotesk = Space_Grotesk({
@@ -38,6 +39,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       className={`${spaceGrotesk.variable} ${ibmPlexSans.variable} ${ibmPlexMono.variable}`}
     >
       <body className="min-h-screen bg-bg font-body text-fg antialiased">
+        <CursorTargetLock />
         <Header />
         {children}
       </body>
