@@ -2,7 +2,7 @@ import { asc, eq } from "drizzle-orm";
 import type { Metadata } from "next";
 import { AnalyzerForm } from "@/components/AnalyzerForm";
 import { db } from "@/db/client";
-import { cpus, gpus } from "@/db/schema";
+import { cpus, games, gpus } from "@/db/schema";
 import { computeProfile } from "@/lib/calculators/profile";
 import { buildShareSearch, parseShareParams } from "@/lib/shareParams";
 
@@ -49,9 +49,10 @@ export async function generateMetadata({
 export default async function AnalizarPage({ searchParams }: { searchParams: SearchParams }) {
   const shared = parseShareParams(await searchParams);
 
-  const [cpuList, gpuList] = await Promise.all([
+  const [cpuList, gpuList, gameList] = await Promise.all([
     db.select().from(cpus).orderBy(asc(cpus.brand), asc(cpus.model)),
     db.select().from(gpus).orderBy(asc(gpus.brand), asc(gpus.model)),
+    db.select().from(games).orderBy(asc(games.name)),
   ]);
 
   return (
@@ -66,7 +67,7 @@ export default async function AnalizarPage({ searchParams }: { searchParams: Sea
           rendimiento, dónde está el límite real de tu equipo y qué te conviene actualizar primero.
         </p>
       </div>
-      <AnalyzerForm cpus={cpuList} gpus={gpuList} initialShare={shared} />
+      <AnalyzerForm cpus={cpuList} gpus={gpuList} games={gameList} initialShare={shared} />
     </main>
   );
 }
