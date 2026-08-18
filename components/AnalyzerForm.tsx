@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { DiagnosticBar } from "@/components/DiagnosticBar";
+import { Spotlight } from "@/components/Spotlight";
 import type { BottleneckResult, LimitingComponent, Severity } from "@/lib/calculators/bottleneck";
 import type { GameEstimate } from "@/lib/calculators/gamesYouCanPlay";
 import type { ProfileResult } from "@/lib/calculators/profile";
@@ -201,7 +202,7 @@ export function AnalyzerForm({ cpus, gpus }: { cpus: Cpu[]; gpus: Gpu[] }) {
           <button
             type="submit"
             disabled={!canSubmit}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-accent px-6 py-3 text-sm font-medium text-white transition-all duration-200 hover:-translate-y-0.5 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 sm:w-auto"
+            className="btn-sheen inline-flex w-full items-center justify-center gap-2 rounded-lg bg-accent px-6 py-3 text-sm font-medium text-white transition-all duration-200 hover:-translate-y-0.5 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 sm:w-auto"
           >
             {loading ? (
               <>
@@ -268,22 +269,20 @@ function Results({
 
         <div className="mt-6 grid gap-4 sm:grid-cols-3">
           {result.balance.map((b, i) => (
-            <div
-              key={b.resolution}
-              className="animate-fade-up rounded-lg border border-border bg-surface-2 p-4"
-              style={{ animationDelay: `${i * 90}ms` }}
-            >
-              <div className="flex items-center justify-between">
-                <span className="font-mono text-sm text-fg">{b.resolution}</span>
-                <span
-                  className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${severityTone(b.severity)}`}
-                >
-                  {b.limitingComponent === "balanced"
-                    ? SEVERITY_LABELS.none
-                    : `${COMPONENT_LABELS[b.limitingComponent]} · ${SEVERITY_LABELS[b.severity]}`}
-                </span>
-              </div>
-              <p className="mt-3 text-sm leading-relaxed text-fg-muted">{b.explanation}</p>
+            <div key={b.resolution} className="animate-fade-up" style={{ animationDelay: `${i * 90}ms` }}>
+              <Spotlight className="rounded-lg border border-border bg-surface-2 p-4 transition-colors duration-200 hover:border-accent-dim">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-sm text-fg">{b.resolution}</span>
+                  <span
+                    className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${severityTone(b.severity)}`}
+                  >
+                    {b.limitingComponent === "balanced"
+                      ? SEVERITY_LABELS.none
+                      : `${COMPONENT_LABELS[b.limitingComponent]} · ${SEVERITY_LABELS[b.severity]}`}
+                  </span>
+                </div>
+                <p className="mt-3 text-sm leading-relaxed text-fg-muted">{b.explanation}</p>
+              </Spotlight>
             </div>
           ))}
         </div>
@@ -298,18 +297,16 @@ function Results({
 
         <div className="mt-6 grid gap-4 sm:grid-cols-3">
           {result.upgrades.map((upgrade, i) => (
-            <div
-              key={upgrade.component}
-              className="animate-fade-up rounded-lg border border-border bg-surface-2 p-4"
-              style={{ animationDelay: `${i * 90}ms` }}
-            >
-              <div className="flex items-center justify-between">
-                <span className="font-display text-sm font-semibold uppercase tracking-wide text-fg">
-                  {upgrade.component}
-                </span>
-                <StarRating priority={upgrade.priority} />
-              </div>
-              <p className="mt-3 text-sm leading-relaxed text-fg-muted">{upgrade.reason}</p>
+            <div key={upgrade.component} className="animate-fade-up" style={{ animationDelay: `${i * 90}ms` }}>
+              <Spotlight className="rounded-lg border border-border bg-surface-2 p-4 transition-colors duration-200 hover:border-accent-dim">
+                <div className="flex items-center justify-between">
+                  <span className="font-display text-sm font-semibold uppercase tracking-wide text-fg">
+                    {upgrade.component}
+                  </span>
+                  <StarRating priority={upgrade.priority} />
+                </div>
+                <p className="mt-3 text-sm leading-relaxed text-fg-muted">{upgrade.reason}</p>
+              </Spotlight>
             </div>
           ))}
         </div>
@@ -323,14 +320,19 @@ function Results({
             <p className="mt-1 text-xs text-fg-muted">FPS estimados a {result.resolution}.</p>
           </div>
 
-          <div className="inline-flex rounded-lg border border-border bg-surface-2 p-1">
+          <div className="relative grid grid-cols-4 rounded-lg border border-border bg-surface-2 p-1">
+            <div
+              aria-hidden
+              className="absolute inset-y-1 rounded-md bg-accent transition-[left] duration-300 ease-out"
+              style={{ left: `calc(${PRESETS.indexOf(preset)} * 25% + 2px)`, width: "calc(25% - 4px)" }}
+            />
             {PRESETS.map((option) => (
               <button
                 key={option}
                 type="button"
                 onClick={() => onPresetChange(option)}
-                className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                  preset === option ? "bg-accent text-white" : "text-fg-muted hover:text-fg"
+                className={`relative z-10 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                  preset === option ? "text-white" : "text-fg-muted hover:text-fg"
                 }`}
               >
                 {PRESET_LABELS[option]}
@@ -353,7 +355,10 @@ function Results({
               {sortedGames.map((game) => {
                 const estimate = game.estimates[preset];
                 return (
-                  <tr key={game.gameId} className="border-b border-border/60 last:border-0">
+                  <tr
+                    key={game.gameId}
+                    className="border-b border-border/60 transition-colors duration-150 last:border-0 hover:bg-surface-2"
+                  >
                     <td className="py-3 text-fg">{game.name}</td>
                     <td className="py-3 capitalize text-fg-muted">{game.genre ?? "—"}</td>
                     <td className="py-3 font-mono tabular-nums text-fg">

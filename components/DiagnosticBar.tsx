@@ -13,6 +13,7 @@ const TICKS = 10;
 
 export function DiagnosticBar({ label, value, sublabel, size = "md" }: DiagnosticBarProps) {
   const [display, setDisplay] = useState(0);
+  const [locked, setLocked] = useState(false);
   const target = Math.max(0, Math.min(100, value));
 
   useEffect(() => {
@@ -21,6 +22,7 @@ export function DiagnosticBar({ label, value, sublabel, size = "md" }: Diagnosti
 
     if (prefersReducedMotion) {
       setDisplay(target);
+      setLocked(true);
       return;
     }
 
@@ -37,6 +39,7 @@ export function DiagnosticBar({ label, value, sublabel, size = "md" }: Diagnosti
         raf = requestAnimationFrame(tick);
       } else {
         setDisplay(target);
+        setLocked(true);
       }
     }
     raf = requestAnimationFrame(tick);
@@ -56,7 +59,9 @@ export function DiagnosticBar({ label, value, sublabel, size = "md" }: Diagnosti
           <span className="text-fg-muted">{size === "lg" ? "/100" : ""}</span>
         </span>
       </div>
-      <div className="relative h-2.5 overflow-hidden rounded-full border border-border bg-surface-2">
+      <div
+        className={`relative h-2.5 overflow-hidden rounded-full border border-border bg-surface-2 ${locked ? "animate-lock-in" : ""}`}
+      >
         <div className="absolute inset-0 z-10 flex justify-between">
           {Array.from({ length: TICKS - 1 }).map((_, i) => (
             <span key={i} className="h-full w-px bg-bg/60" />
