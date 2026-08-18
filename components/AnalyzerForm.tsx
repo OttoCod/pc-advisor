@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { DiagnosticBar } from "@/components/DiagnosticBar";
 import { Spotlight } from "@/components/Spotlight";
 import type { BottleneckResult, LimitingComponent, Severity } from "@/lib/calculators/bottleneck";
@@ -9,6 +9,7 @@ import type { ProfileResult } from "@/lib/calculators/profile";
 import type { Cpu, Gpu, Preset, RamGb, Resolution } from "@/lib/calculators/types";
 import { PRESETS, RAM_OPTIONS, RESOLUTIONS } from "@/lib/calculators/types";
 import type { UpgradeSuggestion } from "@/lib/calculators/upgrade";
+import { buildShareSearch, type ShareParams } from "@/lib/shareParams";
 
 interface AnalyzeResponse {
   cpu: Cpu;
@@ -82,11 +83,69 @@ function StarRating({ priority }: { priority: number }) {
   );
 }
 
-export function AnalyzerForm({ cpus, gpus }: { cpus: Cpu[]; gpus: Gpu[] }) {
-  const [cpuId, setCpuId] = useState("");
-  const [gpuId, setGpuId] = useState("");
-  const [ramGb, setRamGb] = useState<RamGb>(16);
-  const [resolution, setResolution] = useState<Resolution>("1080p");
+function ShareButton({ result }: { result: AnalyzeResponse }) {
+  const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const shareUrl =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/analizar?${buildShareSearch({
+          cpuId: result.cpu.id,
+          gpuId: result.gpu.id,
+          ramGb: result.ramGb,
+          resolution: result.resolution,
+        })}`
+      : "";
+
+  async function handleShareClick() {
+    setOpen(true);
+    setCopied(false);
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // clipboard API unavailable — the input below still lets the user copy manually
+    }
+    requestAnimationFrame(() => inputRef.current?.select());
+  }
+
+  return (
+    <div className="flex flex-col items-end gap-2">
+      <button
+        type="button"
+        onClick={handleShareClick}
+        className="btn-sheen inline-flex items-center gap-2 rounded-lg border border-border bg-surface-2 px-4 py-2 text-xs font-medium text-fg transition-all duration-200 hover:-translate-y-0.5 hover:border-accent-dim"
+      >
+        {copied ? "¡Copiado!" : "Compartir mi diagnóstico"}
+      </button>
+      {open && (
+        <input
+          ref={inputRef}
+          readOnly
+          value={shareUrl}
+          onFocus={(e) => e.currentTarget.select()}
+          className="animate-fade-up w-full max-w-xs rounded-md border border-border bg-surface-2 px-2.5 py-1.5 font-mono text-[11px] text-fg-muted outline-none focus:border-accent sm:max-w-sm"
+        />
+      )}
+    </div>
+  );
+}
+
+export function AnalyzerForm({
+  cpus,
+  gpus,
+  initialShare,
+}: {
+  cpus: Cpu[];
+  gpus: Gpu[];
+  initialShare?: ShareParams | null;
+}) {
+  const [cpuId, setCpuId] = useState(initialShare?.cpuId ?? "");
+  const [gpuId, setGpuId] = useState(initialShare?.gpuId ?? "");
+  const [ramGb, setRamGb] = useState<RamGb>(initialShare?.ramGb ?? 16);
+  const [resolution, setResolution] = useState<Resolution>(initialShare?.resolution ?? "1080p");
   const [preset, setPreset] = useState<Preset>("high");
 
   const [loading, setLoading] = useState(false);
@@ -95,33 +154,47 @@ export function AnalyzerForm({ cpus, gpus }: { cpus: Cpu[]; gpus: Gpu[] }) {
 
   const canSubmit = cpuId !== "" && gpuId !== "" && !loading;
 
+  const runAnalysis = useCallback(
+    async (params: { cpuId: string; gpuId: string; ramGb: RamGb; resolution: Resolution }) => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const res = await fetch("/api/analyze", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(params),
+        });
+
+        if (!res.ok) {
+          const data = await res.json().catch(() => null);
+          throw new Error(data?.error ?? "No pudimos analizar tu PC. Intentá de nuevo.");
+        }
+
+        const data: AnalyzeResponse = await res.json();
+        setResult(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Ocurrió un error inesperado.");
+        setResult(null);
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
+
+  const autoRan = useRef(false);
+  useEffect(() => {
+    if (autoRan.current || !initialShare) return;
+    autoRan.current = true;
+    runAnalysis(initialShare);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!canSubmit) return;
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const res = await fetch("/api/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cpuId, gpuId, ramGb, resolution }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        throw new Error(data?.error ?? "No pudimos analizar tu PC. Intentá de nuevo.");
-      }
-
-      const data: AnalyzeResponse = await res.json();
-      setResult(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Ocurrió un error inesperado.");
-      setResult(null);
-    } finally {
-      setLoading(false);
-    }
+    runAnalysis({ cpuId, gpuId, ramGb, resolution });
   }
 
   return (
@@ -241,10 +314,15 @@ function Results({
     <div className="space-y-10">
       {/* 1. Estado de tu PC */}
       <section className="animate-fade-up rounded-xl border border-border bg-surface p-6">
-        <h2 className="font-display text-xl font-semibold text-fg">Estado de tu PC</h2>
-        <p className="mt-1 text-xs text-fg-muted">
-          Puntaje orientativo 0-100 según tu hardware. No es una medición absoluta.
-        </p>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h2 className="font-display text-xl font-semibold text-fg">Estado de tu PC</h2>
+            <p className="mt-1 text-xs text-fg-muted">
+              Puntaje orientativo 0-100 según tu hardware. No es una medición absoluta.
+            </p>
+          </div>
+          <ShareButton result={result} />
+        </div>
 
         <div className="mt-6 grid gap-8 sm:grid-cols-[auto_1fr] sm:items-center">
           <div className="flex w-full flex-col items-center gap-2 sm:w-56 sm:border-r sm:border-border sm:pr-8">
