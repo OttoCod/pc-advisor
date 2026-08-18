@@ -1,9 +1,54 @@
-import { asc } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
+import type { Metadata } from "next";
 import { AnalyzerForm } from "@/components/AnalyzerForm";
 import { db } from "@/db/client";
 import { cpus, gpus } from "@/db/schema";
+import { computeProfile } from "@/lib/calculators/profile";
+import { buildShareSearch, parseShareParams } from "@/lib/shareParams";
 
-export default async function AnalizarPage() {
+type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
+
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}): Promise<Metadata> {
+  const shared = parseShareParams(await searchParams);
+
+  if (!shared) {
+    return {
+      title: "PC Analyzer — PC Advisor",
+      description: "Analizá tu PC: FPS estimados, cuello de botella y qué actualizar primero.",
+    };
+  }
+
+  const [cpuRows, gpuRows] = await Promise.all([
+    db.select().from(cpus).where(eq(cpus.id, shared.cpuId)),
+    db.select().from(gpus).where(eq(gpus.id, shared.gpuId)),
+  ]);
+  const cpu = cpuRows[0];
+  const gpu = gpuRows[0];
+
+  if (!cpu || !gpu) {
+    return { title: "PC Analyzer — PC Advisor" };
+  }
+
+  const profile = computeProfile(cpu, gpu, shared.ramGb);
+  const title = `${cpu.brand} ${cpu.model} + ${gpu.brand} ${gpu.model} — ${profile.overallScore}/100 | PC Advisor`;
+  const description = `Puntaje general ${profile.overallScore}/100 a ${shared.resolution}. Mirá el diagnóstico completo: FPS estimados, cuello de botella y qué actualizar primero.`;
+  const ogImage = `/api/og?${buildShareSearch(shared)}`;
+
+  return {
+    title,
+    description,
+    openGraph: { title, description, images: [ogImage] },
+    twitter: { card: "summary_large_image", title, description, images: [ogImage] },
+  };
+}
+
+export default async function AnalizarPage({ searchParams }: { searchParams: SearchParams }) {
+  const shared = parseShareParams(await searchParams);
+
   const [cpuList, gpuList] = await Promise.all([
     db.select().from(cpus).orderBy(asc(cpus.brand), asc(cpus.model)),
     db.select().from(gpus).orderBy(asc(gpus.brand), asc(gpus.model)),
@@ -21,7 +66,7 @@ export default async function AnalizarPage() {
           rendimiento, dónde está el límite real de tu equipo y qué te conviene actualizar primero.
         </p>
       </div>
-      <AnalyzerForm cpus={cpuList} gpus={gpuList} />
+      <AnalyzerForm cpus={cpuList} gpus={gpuList} initialShare={shared} />
     </main>
   );
 }

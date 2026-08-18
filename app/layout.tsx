@@ -25,6 +25,7 @@ const ibmPlexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"),
   title: "PC Advisor — Análisis y recomendación de PCs Gaming",
   description:
     "Decime qué PC tenés, qué juegos jugás y cuánto querés gastar. Te ayudamos a decidir qué hacer con ella.",
