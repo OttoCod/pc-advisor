@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import { DiagnosticBar } from "@/components/DiagnosticBar";
 import { Spotlight } from "@/components/Spotlight";
 import type { BottleneckResult, LimitingComponent, Severity } from "@/lib/calculators/bottleneck";
+import type { ComponentDemand, DemandLevel } from "@/lib/calculators/demand";
 import type { GameEstimate } from "@/lib/calculators/gamesYouCanPlay";
 import type { ProfileResult } from "@/lib/calculators/profile";
 import type { PcTier, TierResult } from "@/lib/calculators/tier";
@@ -95,6 +96,45 @@ function confidenceTone(confidence: string): string {
   if (confidence === "high") return "text-good border-good/40";
   if (confidence === "medium") return "text-warn border-warn/40";
   return "text-fg-muted border-border";
+}
+
+const DEMAND_LABELS: Record<DemandLevel, string> = {
+  bajo: "Bajo",
+  medio: "Medio",
+  alto: "Alto",
+};
+
+function demandTone(level: DemandLevel): string {
+  if (level === "alto") return "text-danger";
+  if (level === "medio") return "text-warn";
+  return "text-good";
+}
+
+function DemandTooltip({ demand, children }: { demand: ComponentDemand; children: React.ReactNode }) {
+  return (
+    <span className="group relative inline-block cursor-default border-b border-dotted border-fg-muted/50">
+      {children}
+      <span className="pointer-events-none invisible absolute bottom-full left-0 z-20 mb-2 w-44 -translate-y-1 rounded-lg border border-border bg-surface p-3 opacity-0 shadow-lg transition-all duration-150 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100">
+        <span className="mb-1.5 block text-[10px] uppercase tracking-wide text-fg-muted">
+          Consumo estimado
+        </span>
+        <span className="flex flex-col gap-1 text-xs">
+          <span className="flex items-center justify-between">
+            <span className="text-fg-muted">CPU</span>
+            <span className={`font-medium ${demandTone(demand.cpu)}`}>{DEMAND_LABELS[demand.cpu]}</span>
+          </span>
+          <span className="flex items-center justify-between">
+            <span className="text-fg-muted">GPU</span>
+            <span className={`font-medium ${demandTone(demand.gpu)}`}>{DEMAND_LABELS[demand.gpu]}</span>
+          </span>
+          <span className="flex items-center justify-between">
+            <span className="text-fg-muted">RAM</span>
+            <span className={`font-medium ${demandTone(demand.ram)}`}>{DEMAND_LABELS[demand.ram]}</span>
+          </span>
+        </span>
+      </span>
+    </span>
+  );
 }
 
 function LoadingDots() {
@@ -767,7 +807,9 @@ function Results({
                     key={game.gameId}
                     className="border-b border-border/60 transition-colors duration-150 last:border-0 hover:bg-surface-2"
                   >
-                    <td className="py-3 text-fg">{game.name}</td>
+                    <td className="py-3 text-fg">
+                      <DemandTooltip demand={game.demand}>{game.name}</DemandTooltip>
+                    </td>
                     <td className="py-3 capitalize text-fg-muted">{game.genre ?? "—"}</td>
                     <td className="py-3 font-mono tabular-nums text-fg">
                       {estimate.fpsLow}–{estimate.fpsHigh} FPS
