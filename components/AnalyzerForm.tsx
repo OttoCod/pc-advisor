@@ -6,7 +6,7 @@ import { Spotlight } from "@/components/Spotlight";
 import type { BottleneckResult, LimitingComponent, Severity } from "@/lib/calculators/bottleneck";
 import type { GameEstimate } from "@/lib/calculators/gamesYouCanPlay";
 import type { ProfileResult } from "@/lib/calculators/profile";
-import type { Cpu, Gpu, Preset, RamGb, Resolution } from "@/lib/calculators/types";
+import type { Cpu, Game, Gpu, Preset, RamGb, Resolution } from "@/lib/calculators/types";
 import { PRESETS, RAM_OPTIONS, RESOLUTIONS } from "@/lib/calculators/types";
 import { listUpgradeCandidates, type UpgradeSuggestion } from "@/lib/calculators/upgrade";
 import { buildShareSearch, type ShareParams } from "@/lib/shareParams";
@@ -150,6 +150,7 @@ function UpgradeCandidates({
   preset,
   mainGames,
   currentOverallScore,
+  gameIdFilter,
 }: {
   component: "cpu" | "gpu";
   current: Cpu | Gpu;
@@ -161,6 +162,7 @@ function UpgradeCandidates({
   preset: Preset;
   mainGames: GameEstimate[];
   currentOverallScore: number;
+  gameIdFilter: string[];
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -198,7 +200,9 @@ function UpgradeCandidates({
 
   const mainGamesById = new Map(mainGames.map((g) => [g.gameId, g]));
   const sortedComparisonGames = comparison
-    ? [...comparison.games].sort((a, b) => a.name.localeCompare(b.name))
+    ? [...comparison.games]
+        .filter((g) => gameIdFilter.length === 0 || gameIdFilter.includes(g.gameId))
+        .sort((a, b) => a.name.localeCompare(b.name))
     : [];
   const scoreImproved = comparison ? comparison.profile.overallScore > currentOverallScore : false;
 
@@ -298,13 +302,113 @@ function UpgradeCandidates({
   );
 }
 
+function GameFilter({
+  games,
+  selectedIds,
+  onChange,
+}: {
+  games: Game[];
+  selectedIds: string[];
+  onChange: (ids: string[]) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const selectedGames = games.filter((g) => selectedIds.includes(g.id));
+  const suggestions = games
+    .filter((g) => !selectedIds.includes(g.id))
+    .filter((g) => g.name.toLowerCase().includes(query.trim().toLowerCase()))
+    .slice(0, 8);
+
+  function addGame(id: string) {
+    onChange([...selectedIds, id]);
+    setQuery("");
+  }
+
+  function removeGame(id: string) {
+    onChange(selectedIds.filter((gid) => gid !== id));
+  }
+
+  return (
+    <div ref={containerRef} className="relative">
+      <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-border bg-surface-2 px-2.5 py-2 transition-colors focus-within:border-accent">
+        {selectedGames.map((g) => (
+          <span
+            key={g.id}
+            className="inline-flex items-center gap-1 rounded-full bg-accent/15 px-2.5 py-1 text-xs text-accent"
+          >
+            {g.name}
+            <button
+              type="button"
+              onClick={() => removeGame(g.id)}
+              className="text-accent/70 transition-colors hover:text-accent"
+              aria-label={`Quitar ${g.name}`}
+            >
+              ×
+            </button>
+          </span>
+        ))}
+        <input
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setOpen(true);
+          }}
+          onFocus={() => setOpen(true)}
+          placeholder={selectedGames.length === 0 ? "Buscá un juego para filtrar…" : "Agregar otro…"}
+          className="min-w-[140px] flex-1 bg-transparent py-0.5 text-sm text-fg outline-none placeholder:text-fg-muted"
+        />
+      </div>
+
+      {open && suggestions.length > 0 && (
+        <div className="animate-fade-up absolute z-20 mt-1.5 w-full max-w-xs overflow-hidden rounded-lg border border-border bg-surface shadow-lg">
+          {suggestions.map((g) => (
+            <button
+              key={g.id}
+              type="button"
+              onClick={() => addGame(g.id)}
+              className="flex w-full items-center justify-between px-3 py-2 text-left text-sm text-fg transition-colors hover:bg-surface-2"
+            >
+              <span>{g.name}</span>
+              <span className="text-xs capitalize text-fg-muted">{g.genre}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {selectedGames.length > 0 && (
+        <button
+          type="button"
+          onClick={() => onChange([])}
+          className="mt-2 text-xs text-fg-muted underline decoration-dotted transition-colors hover:text-fg"
+        >
+          Ver todos los juegos de nuevo
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function AnalyzerForm({
   cpus,
   gpus,
+  games,
   initialShare,
 }: {
   cpus: Cpu[];
   gpus: Gpu[];
+  games: Game[];
   initialShare?: ShareParams | null;
 }) {
   const [cpuId, setCpuId] = useState(initialShare?.cpuId ?? "");
@@ -467,6 +571,7 @@ export function AnalyzerForm({
           onPresetChange={setPreset}
           cpus={cpus}
           gpus={gpus}
+          games={games}
         />
       )}
     </div>
@@ -479,14 +584,20 @@ function Results({
   onPresetChange,
   cpus,
   gpus,
+  games,
 }: {
   result: AnalyzeResponse;
   preset: Preset;
   onPresetChange: (preset: Preset) => void;
   cpus: Cpu[];
   gpus: Gpu[];
+  games: Game[];
 }) {
+  const [selectedGameIds, setSelectedGameIds] = useState<string[]>([]);
+
   const sortedGames = [...result.games].sort((a, b) => a.name.localeCompare(b.name));
+  const visibleGames =
+    selectedGameIds.length > 0 ? sortedGames.filter((g) => selectedGameIds.includes(g.gameId)) : sortedGames;
 
   const primaryUpgrade = result.upgrades.find(
     (u): u is UpgradeSuggestion & { component: "cpu" | "gpu" } =>
@@ -588,8 +699,9 @@ function Results({
             ramGb={result.ramGb}
             resolution={result.resolution}
             preset={preset}
-            mainGames={result.games}
+            mainGames={visibleGames}
             currentOverallScore={result.profile.overallScore}
+            gameIdFilter={selectedGameIds}
           />
         )}
       </section>
@@ -599,7 +711,10 @@ function Results({
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h2 className="font-display text-xl font-semibold text-fg">¿Qué juegos podés jugar?</h2>
-            <p className="mt-1 text-xs text-fg-muted">FPS estimados a {result.resolution}.</p>
+            <p className="mt-1 text-xs text-fg-muted">
+              FPS estimados a {result.resolution}
+              {selectedGameIds.length > 0 ? ` — mostrando ${visibleGames.length} de ${sortedGames.length} juegos.` : "."}
+            </p>
           </div>
 
           <div className="relative grid grid-cols-4 rounded-lg border border-border bg-surface-2 p-1">
@@ -623,6 +738,10 @@ function Results({
           </div>
         </div>
 
+        <div className="mt-4 max-w-sm">
+          <GameFilter games={games} selectedIds={selectedGameIds} onChange={setSelectedGameIds} />
+        </div>
+
         <div className="mt-6 overflow-x-auto">
           <table className="w-full min-w-[480px] border-collapse text-sm">
             <thead>
@@ -634,7 +753,7 @@ function Results({
               </tr>
             </thead>
             <tbody>
-              {sortedGames.map((game) => {
+              {visibleGames.map((game) => {
                 const estimate = game.estimates[preset];
                 return (
                   <tr
