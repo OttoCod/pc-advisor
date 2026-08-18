@@ -4,6 +4,7 @@ import { db } from "@/db/client";
 import { benchmarks, cpus, games, gpus } from "@/db/schema";
 import { gamesYouCanPlay } from "@/lib/calculators/gamesYouCanPlay";
 import { computeProfile } from "@/lib/calculators/profile";
+import { computeTier } from "@/lib/calculators/tier";
 import { RAM_OPTIONS, RESOLUTIONS, type RamGb, type Resolution } from "@/lib/calculators/types";
 
 interface CompareRequestBody {
@@ -74,6 +75,7 @@ export async function POST(request: NextRequest) {
   const altGpu = replace === "gpu" ? candidateGpu! : currentGpu;
 
   const profile = computeProfile(altCpu, altGpu, ramGb);
+  const tier = computeTier(profile.overallScore, `${altCpu.id}-${altGpu.id}-${ramGb}`);
   const gamesList = gamesYouCanPlay({
     cpu: altCpu,
     gpu: altGpu,
@@ -85,6 +87,7 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({
     candidate: replace === "cpu" ? candidateCpu : candidateGpu,
     profile,
+    tier,
     games: gamesList,
   });
 }

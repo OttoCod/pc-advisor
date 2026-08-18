@@ -5,6 +5,7 @@ import { benchmarks, cpus, games, gpus } from "@/db/schema";
 import { analyzeBalance } from "@/lib/calculators/bottleneck";
 import { gamesYouCanPlay } from "@/lib/calculators/gamesYouCanPlay";
 import { computeProfile } from "@/lib/calculators/profile";
+import { computeTier } from "@/lib/calculators/tier";
 import { RAM_OPTIONS, RESOLUTIONS, type RamGb, type Resolution } from "@/lib/calculators/types";
 import { suggestUpgrades } from "@/lib/calculators/upgrade";
 
@@ -57,6 +58,7 @@ export async function POST(request: NextRequest) {
   }
 
   const profile = computeProfile(cpu, gpu, ramGb);
+  const tier = computeTier(profile.overallScore, `${cpu.id}-${gpu.id}-${ramGb}`);
   const balance = analyzeBalance(cpu, gpu, RESOLUTIONS);
   const upgrades = suggestUpgrades(cpu, gpu, ramGb, resolution);
   const gamesList = gamesYouCanPlay({
@@ -73,6 +75,7 @@ export async function POST(request: NextRequest) {
     ramGb,
     resolution,
     profile,
+    tier,
     balance,
     upgrades,
     games: gamesList,

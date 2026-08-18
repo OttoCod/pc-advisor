@@ -6,6 +6,7 @@ import { Spotlight } from "@/components/Spotlight";
 import type { BottleneckResult, LimitingComponent, Severity } from "@/lib/calculators/bottleneck";
 import type { GameEstimate } from "@/lib/calculators/gamesYouCanPlay";
 import type { ProfileResult } from "@/lib/calculators/profile";
+import type { PcTier, TierResult } from "@/lib/calculators/tier";
 import type { Cpu, Game, Gpu, Preset, RamGb, Resolution } from "@/lib/calculators/types";
 import { PRESETS, RAM_OPTIONS, RESOLUTIONS } from "@/lib/calculators/types";
 import { listUpgradeCandidates, type UpgradeSuggestion } from "@/lib/calculators/upgrade";
@@ -14,6 +15,7 @@ import { buildShareSearch, type ShareParams } from "@/lib/shareParams";
 interface CompareResponse {
   candidate: Cpu | Gpu;
   profile: ProfileResult;
+  tier: TierResult;
   games: GameEstimate[];
 }
 
@@ -23,9 +25,38 @@ interface AnalyzeResponse {
   ramGb: RamGb;
   resolution: Resolution;
   profile: ProfileResult;
+  tier: TierResult;
   balance: BottleneckResult[];
   upgrades: UpgradeSuggestion[];
   games: GameEstimate[];
+}
+
+const TIER_TONE: Record<PcTier, string> = {
+  S: "text-good border-good/40 bg-good/10",
+  A: "text-good border-good/40 bg-good/10",
+  B: "text-accent border-accent/40 bg-accent/10",
+  C: "text-fg border-border bg-surface-2",
+  D: "text-warn border-warn/40 bg-warn/10",
+  E: "text-warn border-warn/40 bg-warn/10",
+  F: "text-danger border-danger/40 bg-danger/10",
+};
+
+function TierBadge({ tier }: { tier: TierResult }) {
+  return (
+    <div className="animate-fade-up flex items-center gap-3 rounded-lg border border-border bg-surface-2 px-4 py-3">
+      <span
+        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border font-display text-xl font-bold ${TIER_TONE[tier.tier]}`}
+      >
+        {tier.tier}
+      </span>
+      <div>
+        <p className="text-xs uppercase tracking-wide text-fg-muted">
+          Nivel de PC · {tier.label}
+        </p>
+        <p className="mt-0.5 text-sm leading-snug text-fg">{tier.message}</p>
+      </div>
+    </div>
+  );
 }
 
 const PRESET_LABELS: Record<Preset, string> = {
@@ -150,6 +181,7 @@ function UpgradeCandidates({
   preset,
   mainGames,
   currentOverallScore,
+  currentTier,
   gameIdFilter,
 }: {
   component: "cpu" | "gpu";
@@ -162,6 +194,7 @@ function UpgradeCandidates({
   preset: Preset;
   mainGames: GameEstimate[];
   currentOverallScore: number;
+  currentTier: PcTier;
   gameIdFilter: string[];
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -246,7 +279,17 @@ function UpgradeCandidates({
             <span className={`font-mono font-medium ${scoreImproved ? "text-good" : "text-fg"}`}>
               {comparison.profile.overallScore}
             </span>
+            <span className="mx-1 text-border">|</span>
+            <span>Nivel:</span>
+            <span className={`rounded border px-1.5 py-0.5 font-mono font-medium ${TIER_TONE[currentTier]}`}>
+              {currentTier}
+            </span>
+            <span>→</span>
+            <span className={`rounded border px-1.5 py-0.5 font-mono font-medium ${TIER_TONE[comparison.tier.tier]}`}>
+              {comparison.tier.tier}
+            </span>
           </div>
+          <p className="mt-2 text-xs italic text-fg-muted">{comparison.tier.message}</p>
 
           <div className="mt-3 overflow-x-auto">
             <table className="w-full min-w-[440px] border-collapse text-sm">
@@ -636,6 +679,10 @@ function Results({
             ))}
           </div>
         </div>
+
+        <div className="mt-6">
+          <TierBadge tier={result.tier} />
+        </div>
       </section>
 
       {/* 2. Qué está limitando tu PC */}
@@ -781,6 +828,7 @@ function Results({
             preset={preset}
             mainGames={visibleGames}
             currentOverallScore={result.profile.overallScore}
+            currentTier={result.tier.tier}
             gameIdFilter={selectedGameIds}
           />
         )}
