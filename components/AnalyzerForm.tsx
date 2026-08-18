@@ -666,47 +666,7 @@ function Results({
         </div>
       </section>
 
-      {/* 3. Qué deberías actualizar */}
-      <section className="animate-fade-up rounded-xl border border-border bg-surface p-6">
-        <h2 className="font-display text-xl font-semibold text-fg">¿Qué deberías actualizar?</h2>
-        <p className="mt-1 text-xs text-fg-muted">
-          Prioridad calculada para {result.resolution}, tu resolución objetivo.
-        </p>
-
-        <div className="mt-6 grid gap-4 sm:grid-cols-3">
-          {result.upgrades.map((upgrade, i) => (
-            <div key={upgrade.component} className="animate-fade-up" style={{ animationDelay: `${i * 90}ms` }}>
-              <Spotlight className="rounded-lg border border-border bg-surface-2 p-4 transition-colors duration-200 hover:border-accent-dim">
-                <div className="flex items-center justify-between">
-                  <span className="font-display text-sm font-semibold uppercase tracking-wide text-fg">
-                    {upgrade.component}
-                  </span>
-                  <StarRating priority={upgrade.priority} />
-                </div>
-                <p className="mt-3 text-sm leading-relaxed text-fg-muted">{upgrade.reason}</p>
-              </Spotlight>
-            </div>
-          ))}
-        </div>
-
-        {primaryUpgrade && upgradeCandidates.length > 0 && (
-          <UpgradeCandidates
-            component={primaryUpgrade.component}
-            current={primaryUpgrade.component === "cpu" ? result.cpu : result.gpu}
-            candidates={upgradeCandidates}
-            cpuId={result.cpu.id}
-            gpuId={result.gpu.id}
-            ramGb={result.ramGb}
-            resolution={result.resolution}
-            preset={preset}
-            mainGames={visibleGames}
-            currentOverallScore={result.profile.overallScore}
-            gameIdFilter={selectedGameIds}
-          />
-        )}
-      </section>
-
-      {/* 4. Qué juegos podés jugar */}
+      {/* 3. Qué juegos podés jugar */}
       <section className="animate-fade-up rounded-xl border border-border bg-surface p-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
@@ -784,6 +744,46 @@ function Results({
           confianza indica si están respaldados por un benchmark real (alta) o interpolados a
           partir de tu hardware (media/baja).
         </p>
+      </section>
+
+      {/* 4. Qué deberías actualizar */}
+      <section className="animate-fade-up rounded-xl border border-border bg-surface p-6">
+        <h2 className="font-display text-xl font-semibold text-fg">¿Qué deberías actualizar?</h2>
+        <p className="mt-1 text-xs text-fg-muted">
+          Prioridad calculada para {result.resolution}, tu resolución objetivo.
+        </p>
+
+        <div className="mt-6 grid gap-4 sm:grid-cols-3">
+          {result.upgrades.map((upgrade, i) => (
+            <div key={upgrade.component} className="animate-fade-up" style={{ animationDelay: `${i * 90}ms` }}>
+              <Spotlight className="rounded-lg border border-border bg-surface-2 p-4 transition-colors duration-200 hover:border-accent-dim">
+                <div className="flex items-center justify-between">
+                  <span className="font-display text-sm font-semibold uppercase tracking-wide text-fg">
+                    {upgrade.component}
+                  </span>
+                  <StarRating priority={upgrade.priority} />
+                </div>
+                <p className="mt-3 text-sm leading-relaxed text-fg-muted">{upgrade.reason}</p>
+              </Spotlight>
+            </div>
+          ))}
+        </div>
+
+        {primaryUpgrade && upgradeCandidates.length > 0 && (
+          <UpgradeCandidates
+            component={primaryUpgrade.component}
+            current={primaryUpgrade.component === "cpu" ? result.cpu : result.gpu}
+            candidates={upgradeCandidates}
+            cpuId={result.cpu.id}
+            gpuId={result.gpu.id}
+            ramGb={result.ramGb}
+            resolution={result.resolution}
+            preset={preset}
+            mainGames={visibleGames}
+            currentOverallScore={result.profile.overallScore}
+            gameIdFilter={selectedGameIds}
+          />
+        )}
       </section>
     </div>
   );
