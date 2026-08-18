@@ -56,3 +56,21 @@ export function suggestUpgrades(cpu: Cpu, gpu: Gpu, ramGb: RamGb, resolution: Re
     { component: "ram", priority: ramPriority, reason: ramReason },
   ];
 }
+
+const MAX_UPGRADE_CANDIDATES = 6;
+
+/**
+ * Componentes del mismo tipo (CPU o GPU) mejores que el actual, ordenados de
+ * menor a mayor score. Sirve para armar la lista "qué comprar" en la UI, sin
+ * lógica de precio (todavía no hay tabla de precios en el MVP).
+ */
+export function listUpgradeCandidates<T extends { id: string; relativePerformanceScore: number }>(
+  current: T,
+  options: T[],
+  limit: number = MAX_UPGRADE_CANDIDATES
+): T[] {
+  return options
+    .filter((option) => option.id !== current.id && option.relativePerformanceScore > current.relativePerformanceScore)
+    .sort((a, b) => a.relativePerformanceScore - b.relativePerformanceScore)
+    .slice(0, limit);
+}
